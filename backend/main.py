@@ -38,9 +38,9 @@ async def search_tenders_endpoint(
     region: Optional[str] = Query(None, description="Регион, например: Харківська"),
     min_amount: Optional[float] = Query(None, description="Минимальная сумма тендера"),
     max_amount: Optional[float] = Query(None, description="Максимальная сумма тендера"),
-    limit: int = Query(20, ge=1, le=100, description="Количество результатов")
+    limit: int = Query(20, ge=1, le=100)
 ):
-    """Поиск тендеров по заданным параметрам"""
+    """Поиск тендеров по параметрам"""
     tenders = await search_tenders(
         keywords=keywords,
         cpv=cpv,
