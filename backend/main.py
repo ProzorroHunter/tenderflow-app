@@ -4,14 +4,14 @@ import os
 from dotenv import load_dotenv
 from typing import Optional
 
-# Импортируем функцию поиска
-from prozorro import search_tenders
+# Импорт из папки app
+from app.prozorro import search_tenders
 
 load_dotenv()
 
 app = FastAPI(
     title="ProzorroHunter — TenderFlow",
-    description="Автоматический трекер тендеров Prozorro 24/7",
+    description="Автоматический трекер тендеров Prozorro 24/7 с уведомлениями в Telegram",
     version="0.1.0"
 )
 
@@ -26,24 +26,21 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {
-        "message": "ProzorroHunter backend запущен успешно",
+        "message": "ProzorroHunter backend успешно запущен",
         "status": "ok",
         "version": "0.1.0"
     }
 
 @app.get("/search")
-async def search(
-    keywords: Optional[str] = Query(None, description="Ключевые слова для поиска"),
+async def search_tenders_endpoint(
+    keywords: Optional[str] = Query(None, description="Ключевые слова, например: будівництво Харків"),
     cpv: Optional[str] = Query(None, description="CPV-код"),
-    region: Optional[str] = Query(None, description="Регион"),
-    min_amount: Optional[float] = Query(None, description="Минимальная сумма"),
-    max_amount: Optional[float] = Query(None, description="Максимальная сумма"),
-    limit: int = Query(20, description="Количество результатов")
+    region: Optional[str] = Query(None, description="Регион, например: Харківська"),
+    min_amount: Optional[float] = Query(None, description="Минимальная сумма тендера"),
+    max_amount: Optional[float] = Query(None, description="Максимальная сумма тендера"),
+    limit: int = Query(20, ge=1, le=100)
 ):
-    """
-    Поиск тендеров по параметрам.
-    Пример: /search?keywords=будівництво&region=Харківська&min_amount=100000
-    """
+    """Поиск тендеров по заданным параметрам"""
     tenders = await search_tenders(
         keywords=keywords,
         cpv=cpv,
@@ -54,7 +51,7 @@ async def search(
     )
     return {
         "count": len(tenders),
-        "tenders": tenders
+        "tenders": tenders[:limit]
     }
 
 if __name__ == "__main__":
