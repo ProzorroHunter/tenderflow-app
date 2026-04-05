@@ -4,8 +4,8 @@ import os
 from dotenv import load_dotenv
 from typing import Optional
 
-# Правильный импорт из папки app
-from app.prozorro import search_tenders
+# Импорт из того же уровня (backend/prozorro.py)
+from prozorro import search_tenders
 
 load_dotenv()
 
