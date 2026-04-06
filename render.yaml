@@ -1,0 +1,98 @@
+services:
+  # FastAPI Web Service
+  - type: web
+    name: prozorrohunter-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: prozorrohunter-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: prozorrohunter-redis
+          type: redis
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHANNEL_ID
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: False
+      - key: PROZORRO_API_BASE
+        value: https://public-api.prozorro.gov.ua/api/2.5
+
+  # Celery Worker (фоновые задачи)
+  - type: worker
+    name: prozorrohunter-worker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A backend.celery_app worker --loglevel=info
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: prozorrohunter-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: prozorrohunter-redis
+          type: redis
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHANNEL_ID
+        sync: false
+      - key: PROZORRO_API_BASE
+        value: https://public-api.prozorro.gov.ua/api/2.5
+
+  # Celery Beat (планировщик)
+  - type: worker
+    name: prozorrohunter-beat
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A backend.celery_app beat --loglevel=info
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: prozorrohunter-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: prozorrohunter-redis
+          type: redis
+          property: connectionString
+
+  # Telegram Bot
+  - type: worker
+    name: prozorrohunter-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: prozorrohunter-db
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHANNEL_ID
+        sync: false
+      - key: API_BASE_URL
+        fromService:
+          name: prozorrohunter-api
+          type: web
+          property: host
+
+databases:
+  - name: prozorrohunter-db
+    databaseName: prozorrohunter
+    user: prozorro
+    plan: starter
+
+  # Redis для Celery
+  - name: prozorrohunter-redis
+    plan: starter

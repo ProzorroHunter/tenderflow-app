@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: prozorrohunter_db
+    environment:
+      POSTGRES_DB: prozorrohunter
+      POSTGRES_USER: prozorro
+      POSTGRES_PASSWORD: secure_password_change_me
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prozorro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis для Celery
+  redis:
+    image: redis:7-alpine
+    container_name: prozorrohunter_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # FastAPI backend
+  api:
+    build: .
+    container_name: prozorrohunter_api
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app/backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://prozorro:secure_password_change_me@postgres:5432/prozorrohunter
+      - REDIS_URL=redis://redis:6379/0
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+      - SECRET_KEY=${SECRET_KEY:-super-secret-key-change-in-production}
+      - DEBUG=True
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Celery Worker для фоновых задач
+  celery_worker:
+    build: .
+    container_name: prozorrohunter_worker
+    command: celery -A backend.celery_app worker --loglevel=info
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - DATABASE_URL=postgresql://prozorro:secure_password_change_me@postgres:5432/prozorrohunter
+      - REDIS_URL=redis://redis:6379/0
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Celery Beat для периодических задач
+  celery_beat:
+    build: .
+    container_name: prozorrohunter_beat
+    command: celery -A backend.celery_app beat --loglevel=info
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - DATABASE_URL=postgresql://prozorro:secure_password_change_me@postgres:5432/prozorrohunter
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Telegram Bot
+  bot:
+    build: .
+    container_name: prozorrohunter_bot
+    command: python bot.py
+    volumes:
+      - ./bot.py:/app/bot.py
+      - ./backend:/app/backend
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+      - API_BASE_URL=http://api:8000
+      - DATABASE_URL=postgresql://prozorro:secure_password_change_me@postgres:5432/prozorrohunter
+    depends_on:
+      - api
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
