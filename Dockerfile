@@ -6,7 +6,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir aiogram==3.13.0 python-dotenv==1.0.0 aiohttp==3.10.5
 
 # Копируем бота
-COPY bot_simple.py bot.py
+COPY bot.py .
 
 # Создаём простой HTTP сервер для health check
 RUN cat > /app/server.py << 'PYEOF'
